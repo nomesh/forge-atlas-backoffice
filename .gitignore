@@ -37,7 +37,8 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 /outputs/
 /work/
-# corrupted temp dirs from bracket handling (Windows ACL workaround)
+# corrupted temp dirs from bracket handling (Windows ACL workaround) - malformed without ]
 app/customers/\[customerId
-app/customers/\[customerId\]
+!app/customers/\[customerId\]/
+!app/customers/\[customerId\]/page.tsx
 app/customers/_empty_tmp
