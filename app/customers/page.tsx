@@ -46,7 +46,7 @@ export default function CustomersPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="grid min-h-screen lg:grid-cols-[248px_1fr]">
-        <SidebarNav />
+        <SidebarNav active="/customers" />
         <section className="min-w-0">
           <header className="flex h-16 items-center justify-between border-b bg-card/80 px-5 backdrop-blur md:px-8">
             <div>

@@ -9,7 +9,6 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 function NavItem({
   icon,
@@ -45,8 +44,11 @@ function NavItem({
     <span className="block cursor-pointer">{btn}</span>
   );
 }
-export function SidebarNav() {
-  const pathname = usePathname();
+export function SidebarNav({
+  active,
+}: {
+  active?: '/' | '/customers';
+}) {
   return (
     <aside className="hidden border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex lg:flex-col">
       <div className="flex items-center gap-3 px-3 pb-7">
@@ -63,13 +65,13 @@ export function SidebarNav() {
           href="/"
           icon={<LayoutDashboard />}
           label="Overview"
-          active={pathname === '/'}
+          active={active === '/'}
         />
         <NavItem
           href="/customers"
           icon={<Building2 />}
           label="Customers"
-          active={pathname.startsWith('/customers')}
+          active={active === '/customers'}
         />
         <NavItem icon={<Users />} label="Provisioning" count="2" />
         <NavItem icon={<Activity />} label="Operations" />
