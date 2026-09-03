@@ -1,6 +1,7 @@
 'use client';
 import { ArrowLeft, CheckCircle2, LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ function RegisterForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingKey, setPendingKey] = useState<string | undefined>(undefined);
+  // oxlint-disable-next-line typescript/no-deprecated
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -114,7 +116,7 @@ function RegisterForm({
               >
                 Cancel
               </Button>
-              <Button disabled={busy}>
+              <Button type="submit" disabled={busy}>
                 {busy && <LoaderCircle className="animate-spin" />}
                 Register and provision
               </Button>
@@ -165,13 +167,13 @@ export default function RegisterCustomer() {
   return (
     <main className="min-h-screen bg-background p-5 md:p-10">
       <div className="mx-auto max-w-3xl">
-        <a
+        <Link
           href="/"
           className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to overview
-        </a>
+        </Link>
         <div className="mb-7 flex items-center gap-3">
           <div className="grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground">
             <CheckCircle2 />
