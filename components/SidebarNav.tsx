@@ -2,6 +2,7 @@
 import {
   LayoutDashboard,
   Building2,
+  GraduationCap,
   Users,
   Activity,
   LifeBuoy,
@@ -47,7 +48,7 @@ function NavItem({
 export function SidebarNav({
   active,
 }: {
-  active?: '/' | '/customers';
+  active?: '/' | '/customers' | '/curriculum';
 }) {
   return (
     <aside className="hidden border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex lg:flex-col">
@@ -72,6 +73,12 @@ export function SidebarNav({
           icon={<Building2 />}
           label="Customers"
           active={active === '/customers'}
+        />
+        <NavItem
+          href="/curriculum"
+          icon={<GraduationCap />}
+          label="Curriculum Base"
+          active={active === '/curriculum'}
         />
         <NavItem icon={<Users />} label="Provisioning" count="2" />
         <NavItem icon={<Activity />} label="Operations" />

@@ -128,4 +128,33 @@ describe('backofficeApi', () => {
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer test-token');
   });
+
+  it('deleteCurriculumResource issues DELETE with proper URL, headers and tenant', async () => {
+    const fetchMock = mockFetchOnce(204, {});
+    const revId = '550e8400-e29b-41d4-a716-446655440000';
+    await backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0][0] as string;
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(url).toBe(`http://localhost:8080/api/v1/learn/resources/${revId}`);
+    expect(init.method).toBe('DELETE');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer test-token');
+    expect(headers['X-Atlas-Tenant-Id']).toBe('atlas-pilot');
+  });
+
+  it('deleteCurriculumResource throws AtlasApiError on failure', async () => {
+    mockFetchOnce(500, { error: 'DELETE_FAILED', message: 'Failed to purge chunks' });
+    const revId = 'test-rev-id';
+    await expect(backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot')).rejects.toThrow(AtlasApiError);
+    try {
+      await backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AtlasApiError);
+      expect((e as AtlasApiError).status).toBe(500);
+      expect((e as AtlasApiError).error).toBe('DELETE_FAILED');
+      expect((e as AtlasApiError).message).toBe('Failed to purge chunks');
+    }
+  });
 });
