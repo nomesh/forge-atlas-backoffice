@@ -1,8 +1,22 @@
 'use client';
 import Keycloak from 'keycloak-js';
 
+export function resolveKeycloakUrl(): string {
+  if (import.meta.env.VITE_KEYCLOAK_URL) {
+    return import.meta.env.VITE_KEYCLOAK_URL;
+  }
+  return import.meta.env.PROD ? 'https://atlas.neuralworks.lk' : 'http://localhost:8081';
+}
+
+export function resolveApiBaseUrl(): string {
+  if (typeof import.meta.env.VITE_API_BASE_URL === 'string') {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  return import.meta.env.PROD ? '' : 'http://localhost:8080';
+}
+
 const keycloak = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8081',
+  url: resolveKeycloakUrl(),
   realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'forge-atlas',
   clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'forge-atlas-backoffice',
 });
@@ -97,7 +111,7 @@ async function request<T>(
     Object.assign(headers, h as Record<string, string>);
   }
   const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'}${path}`,
+    `${resolveApiBaseUrl()}${path}`,
     { ...init, headers },
   );
   if (!response.ok) {
@@ -178,7 +192,7 @@ export const backofficeApi = {
     );
 
     const authToken = await token();
-    const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+    const baseUrl = resolveApiBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/learn/resources`, {
       method: 'POST',
       headers: {
@@ -206,7 +220,7 @@ export const backofficeApi = {
     tenantId: string = 'atlas-pilot',
   ): Promise<void> {
     const authToken = await token();
-    const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+    const baseUrl = resolveApiBaseUrl();
     const response = await fetch(
       `${baseUrl}/api/v1/learn/resources/${encodeURIComponent(revisionId)}`,
       {

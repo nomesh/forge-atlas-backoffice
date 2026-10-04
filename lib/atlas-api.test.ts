@@ -11,7 +11,7 @@ vi.mock('keycloak-js', () => {
   };
 });
 
-import { backofficeApi, AtlasApiError } from './atlas-api';
+import { backofficeApi, AtlasApiError, resolveKeycloakUrl, resolveApiBaseUrl } from './atlas-api';
 
 const originalFetch = global.fetch;
 const originalCrypto = global.crypto;
@@ -156,5 +156,54 @@ describe('backofficeApi', () => {
       expect((e as AtlasApiError).error).toBe('DELETE_FAILED');
       expect((e as AtlasApiError).message).toBe('Failed to purge chunks');
     }
+  });
+
+  describe('URL resolution and regression guards', () => {
+    const originalEnv = { ...import.meta.env };
+
+    afterEach(() => {
+      // restore env
+      Object.assign(import.meta.env, originalEnv);
+      delete import.meta.env.VITE_KEYCLOAK_URL;
+      delete import.meta.env.VITE_API_BASE_URL;
+    });
+
+    it('resolveKeycloakUrl respects explicit VITE_KEYCLOAK_URL', () => {
+      import.meta.env.VITE_KEYCLOAK_URL = 'https://custom-auth.example.com';
+      expect(resolveKeycloakUrl()).toBe('https://custom-auth.example.com');
+    });
+
+    it('resolveKeycloakUrl defaults to production URL when in production mode', () => {
+      delete import.meta.env.VITE_KEYCLOAK_URL;
+      (import.meta.env as Record<string, unknown>).PROD = true;
+      expect(resolveKeycloakUrl()).toBe('https://atlas.neuralworks.lk');
+      expect(resolveKeycloakUrl()).not.toContain('localhost');
+      expect(resolveKeycloakUrl()).not.toContain('8081');
+    });
+
+    it('resolveKeycloakUrl defaults to localhost:8081 when in development mode', () => {
+      delete import.meta.env.VITE_KEYCLOAK_URL;
+      (import.meta.env as Record<string, unknown>).PROD = false;
+      expect(resolveKeycloakUrl()).toBe('http://localhost:8081');
+    });
+
+    it('resolveApiBaseUrl respects explicit VITE_API_BASE_URL', () => {
+      import.meta.env.VITE_API_BASE_URL = 'https://api.example.com';
+      expect(resolveApiBaseUrl()).toBe('https://api.example.com');
+    });
+
+    it('resolveApiBaseUrl defaults to empty string in production mode for relative proxying', () => {
+      delete import.meta.env.VITE_API_BASE_URL;
+      (import.meta.env as Record<string, unknown>).PROD = true;
+      expect(resolveApiBaseUrl()).toBe('');
+      expect(resolveApiBaseUrl()).not.toContain('localhost');
+      expect(resolveApiBaseUrl()).not.toContain('8080');
+    });
+
+    it('resolveApiBaseUrl defaults to localhost:8080 in development mode', () => {
+      delete import.meta.env.VITE_API_BASE_URL;
+      (import.meta.env as Record<string, unknown>).PROD = false;
+      expect(resolveApiBaseUrl()).toBe('http://localhost:8080');
+    });
   });
 });

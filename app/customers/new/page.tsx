@@ -91,7 +91,7 @@ function RegisterForm({
                 setIssuer(e.target.value);
                 if (pendingKey) setPendingKey(undefined);
               }}
-              placeholder="http://localhost:8081/realms/forge-atlas"
+              placeholder="https://atlas.neuralworks.lk/realms/forge-atlas"
               required
             />
           </div>
