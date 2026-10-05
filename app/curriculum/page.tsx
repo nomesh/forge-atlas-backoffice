@@ -1,5 +1,6 @@
 'use client';
 import {
+  AlertTriangle,
   Bell,
   BookOpen,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Loader2,
   RefreshCw,
   Search,
+  Sparkles,
   Trash2,
   Upload,
   UploadCloud,
@@ -30,24 +32,6 @@ import {
   type CurriculumResourceType,
 } from '@/lib/atlas-api';
 
-const FALLBACK_SUBJECTS = [
-  { code: 'SCIENCE', name: 'Science (විද්‍යාව / அறிவியல்)' },
-  { code: 'MATHEMATICS', name: 'Mathematics (ගණිතය / கணிதம்)' },
-  { code: 'ICT', name: 'Information & Comm. Technology (තොරතුරු තාක්ෂණය)' },
-  { code: 'HISTORY', name: 'History (ඉතිහාසය / வரலாறு)' },
-  { code: 'ENGLISH', name: 'English Language (ඉංග්‍රීසි භාෂාව)' },
-  { code: 'GEOGRAPHY', name: 'Geography (භූගෝල විද්‍යාව)' },
-  { code: 'COMMERCE', name: 'Commerce & Accounting (ව්‍යාපාර හා ගිණුම්කරණය)' },
-];
-
-const FALLBACK_RESOURCE_TYPES: { value: CurriculumResourceType; label: string }[] = [
-  { value: 'TEXTBOOK', label: 'Official Textbook (පෙළපොත)' },
-  { value: 'TEACHER_GUIDE', label: 'Teacher Guide (ගුරු මාර්ගෝපදේශය)' },
-  { value: 'SYLLABUS', label: 'Syllabus / Curriculum Guide (විෂය නිර්දේශය)' },
-  { value: 'PAST_PAPER', label: 'Past Paper / Marking Scheme (පසුගිය විභාග ප්‍රශ්න පත්‍ර)' },
-  { value: 'LESSON_MATERIAL', label: 'Lesson / Supplementary Material (අතිරේක කියවීම්)' },
-];
-
 function toSlug(str: string): string {
   return str
     .toLowerCase()
@@ -56,26 +40,54 @@ function toSlug(str: string): string {
     .slice(0, 40);
 }
 
-function analyzeFilename(name: string) {
+interface DetectedMetadata {
+  grade?: number;
+  subjectCode?: string;
+  language?: string;
+  title?: string;
+  part?: string | null;
+}
+
+function analyzeFilename(name: string): DetectedMetadata {
   const lower = name.toLowerCase();
 
   // Grade heuristic: e.g. gr_10, gr-10, grade 10, g-10, gr10, etc.
   const gradeMatch = lower.match(/(?:grade|gr|\bg)[\s_.-]?(\d{1,2})\b/i);
-  let grade = 10;
+  let grade: number | undefined;
   if (gradeMatch) {
     const parsed = parseInt(gradeMatch[1], 10);
     if (parsed >= 1 && parsed <= 13) grade = parsed;
   }
 
   // Subject heuristic
-  let subjectCode = 'SCIENCE';
-  if (lower.includes('history') || lower.includes('ithihasaya') || lower.includes('varalaaru')) subjectCode = 'HISTORY';
-  else if (lower.includes('math') || lower.includes('ganithaya') || lower.includes('kanitham')) subjectCode = 'MATHEMATICS';
-  else if (lower.includes('ict') || lower.includes('computer') || lower.includes('information')) subjectCode = 'ICT';
-  else if (lower.includes('english') || lower.includes('ingrisi')) subjectCode = 'ENGLISH';
-  else if (lower.includes('geo') || lower.includes('bhugola')) subjectCode = 'GEOGRAPHY';
-  else if (lower.includes('business') || lower.includes('accounting') || lower.includes('commerce') || lower.includes('vyapara')) subjectCode = 'COMMERCE';
-  else if (lower.includes('science') || lower.includes('vidyava') || lower.includes('ariviyal')) subjectCode = 'SCIENCE';
+  let subjectCode: string | undefined;
+  if (lower.includes('sinhala lit') || lower.includes('sahithy') || lower.includes('sinhala-lit') || lower.includes('sinhala_lit')) {
+    subjectCode = 'SINHALA_LITERATURE';
+  } else if (lower.includes('english lit') || lower.includes('english-lit')) {
+    subjectCode = 'ENGLISH_LITERATURE';
+  } else if (lower.includes('home science') || lower.includes('home eco') || lower.includes('home-science') || lower.includes('home_science') || lower.includes('graha')) {
+    subjectCode = 'HOME_SCIENCE';
+  } else if (lower.includes('history') || lower.includes('ithihasaya') || lower.includes('varalaaru')) {
+    subjectCode = 'HISTORY';
+  } else if (lower.includes('math') || lower.includes('ganithaya') || lower.includes('kanitham')) {
+    subjectCode = 'MATHEMATICS';
+  } else if (lower.includes('ict') || lower.includes('computer') || lower.includes('information tech')) {
+    subjectCode = 'ICT';
+  } else if (lower.includes('english') || lower.includes('ingrisi')) {
+    subjectCode = 'ENGLISH';
+  } else if (lower.includes('geo') || lower.includes('bhugola') || lower.includes('puviyiyal')) {
+    subjectCode = 'GEOGRAPHY';
+  } else if (lower.includes('business') || lower.includes('accounting') || lower.includes('commerce') || lower.includes('vyapara')) {
+    subjectCode = 'COMMERCE';
+  } else if (lower.includes('science') || lower.includes('vidyava') || lower.includes('ariviyal')) {
+    subjectCode = 'SCIENCE';
+  } else if (lower.includes('health') || lower.includes('saukhya')) {
+    subjectCode = 'HEALTH_PHYSICAL_EDUCATION';
+  } else if (lower.includes('civic') || lower.includes('citizen') || lower.includes('purawasi')) {
+    subjectCode = 'CIVIC_EDUCATION';
+  } else if (lower.includes('agri') || lower.includes('krushi')) {
+    subjectCode = 'AGRICULTURE';
+  }
 
   // Part / Volume heuristic: e.g. part 1, part 2, part i, part ii, p1, p2, p i, p ii
   let part: string | null = null;
@@ -85,9 +97,14 @@ function analyzeFilename(name: string) {
   }
 
   // Language / medium heuristic
-  let language = 'EN';
-  if (lower.includes('_si') || lower.includes('-si') || lower.includes('sinhala') || lower.includes('sin')) language = 'SI';
-  else if (lower.includes('_ta') || lower.includes('-ta') || lower.includes('tamil') || lower.includes('tam')) language = 'TA';
+  let language: string | undefined;
+  if (lower.includes('_si') || lower.includes('-si') || lower.includes('sinhala') || lower.includes('sin')) {
+    language = 'SI';
+  } else if (lower.includes('_ta') || lower.includes('-ta') || lower.includes('tamil') || lower.includes('tam')) {
+    language = 'TA';
+  } else if (lower.includes('_en') || lower.includes('-en') || lower.includes('english') || lower.includes('eng')) {
+    language = 'EN';
+  }
 
   // Clean title: remove file extension and dashes/underscores
   const cleanTitle = name
@@ -146,6 +163,7 @@ export default function CurriculumPage() {
   const [isCustomReference, setIsCustomReference] = useState<boolean>(false);
   const [isCustomVersion, setIsCustomVersion] = useState<boolean>(false);
   const [detectedPart, setDetectedPart] = useState<string | null>(null);
+  const [suggestedMetadata, setSuggestedMetadata] = useState<DetectedMetadata | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Deletion state
@@ -156,10 +174,7 @@ export default function CurriculumPage() {
     setIsLoading(true);
     try {
       const [catData, resData] = await Promise.all([
-        backofficeApi.getCurriculumCatalogue().catch((e) => {
-          console.warn('Failed to fetch DB-driven catalogue, using defaults:', e);
-          return null;
-        }),
+        backofficeApi.getCurriculumCatalogue(),
         backofficeApi.listCurriculumResources(),
       ]);
 
@@ -178,8 +193,9 @@ export default function CurriculumPage() {
       setResources(resData);
       setError(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unable to load curriculum resources.';
+      const msg = err instanceof Error ? err.message : 'Unable to load curriculum catalogue or resources.';
       setError(msg);
+      setCatalogue(null);
     } finally {
       setIsLoading(false);
     }
@@ -212,18 +228,40 @@ export default function CurriculumPage() {
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     const analysis = analyzeFilename(file.name);
-    setUploadGrade(analysis.grade);
-    setUploadSubject(analysis.subjectCode);
-    setUploadLanguage(analysis.language);
-    setUploadTitle(analysis.title);
-    setDetectedPart(analysis.part);
+    setSuggestedMetadata(analysis);
+
+    // Populate title & part if title is currently empty
+    if (!uploadTitle.trim() && analysis.title) {
+      setUploadTitle(analysis.title);
+      setDetectedPart(analysis.part || null);
+      if (!isCustomReference) {
+        setUploadReference(computeReference(uploadSubject, uploadGrade, analysis.title, analysis.part));
+      }
+    }
+  };
+
+  const applySuggestedMetadata = () => {
+    if (!suggestedMetadata) return;
+    const newGrade = suggestedMetadata.grade ?? uploadGrade;
+    const newSubject = suggestedMetadata.subjectCode ?? uploadSubject;
+    const newLanguage = suggestedMetadata.language ?? uploadLanguage;
+    const newTitle = suggestedMetadata.title || uploadTitle;
+    const newPart = suggestedMetadata.part !== undefined ? suggestedMetadata.part : detectedPart;
+
+    setUploadGrade(newGrade);
+    setUploadSubject(newSubject);
+    setUploadLanguage(newLanguage);
+    if (newTitle) setUploadTitle(newTitle);
+    setDetectedPart(newPart);
+
     setIsCustomReference(false);
     setIsCustomVersion(false);
+    setUploadReference(computeReference(newSubject, newGrade, newTitle, newPart));
+    setUploadVersion(computeVersion(uploadYear, newLanguage, newPart));
+  };
 
-    const ref = computeReference(analysis.subjectCode, analysis.grade, analysis.title, analysis.part);
-    const ver = computeVersion(uploadYear, analysis.language, analysis.part);
-    setUploadReference(ref);
-    setUploadVersion(ver);
+  const dismissSuggestedMetadata = () => {
+    setSuggestedMetadata(null);
   };
 
   const handleSubjectChange = (newSubject: string) => {
@@ -341,26 +379,42 @@ export default function CurriculumPage() {
   const totalChunks = resources.reduce((sum, r) => sum + (r.indexedChunks || 0), 0);
   const uniqueLanguages = new Set(resources.map((r) => r.languageCode)).size;
 
-  // DB-driven catalogue options with graceful fallbacks
+  // DB-driven catalogue options - strictly sourced from authoritative database catalogue
   const availableGrades = catalogue?.grades?.length
     ? catalogue.grades.map((g) => g.gradeNumber)
-    : Array.from({ length: 13 }, (_, i) => i + 1);
+    : [];
 
-  const availableSubjects = catalogue?.subjects?.length
-    ? catalogue.subjects.map((s) => ({ code: s.code, name: s.name }))
-    : FALLBACK_SUBJECTS;
+  // All catalog subjects for global search/filtering
+  const allSubjects = catalogue?.subjects?.length
+    ? catalogue.subjects.map((s) => ({ code: s.code, name: s.name, grades: s.grades }))
+    : [];
+
+  // Subjects applicable to currently selected uploadGrade
+  const availableUploadSubjects = catalogue?.subjects?.length
+    ? catalogue.subjects
+        .filter((s) => !s.grades || s.grades.length === 0 || s.grades.includes(uploadGrade))
+        .map((s) => ({ code: s.code, name: s.name }))
+    : [];
+
+  // Metadata mismatch detection between filename hints and operator choices
+  const hasGradeMismatch = Boolean(
+    suggestedMetadata?.grade && suggestedMetadata.grade !== uploadGrade
+  );
+  const hasSubjectMismatch = Boolean(
+    suggestedMetadata?.subjectCode && suggestedMetadata.subjectCode !== uploadSubject
+  );
+  const hasLanguageMismatch = Boolean(
+    suggestedMetadata?.language && suggestedMetadata.language !== uploadLanguage
+  );
+  const hasAnyMismatch = hasGradeMismatch || hasSubjectMismatch || hasLanguageMismatch;
 
   const availableLanguages = catalogue?.languages?.length
     ? catalogue.languages
-    : [
-        { code: 'EN', name: 'English Medium (EN)' },
-        { code: 'SI', name: 'Sinhala Medium (සිංහල - SI)' },
-        { code: 'TA', name: 'Tamil Medium (தமிழ் - TA)' },
-      ];
+    : [];
 
   const availableResourceTypes = catalogue?.resourceTypes?.length
     ? catalogue.resourceTypes
-    : FALLBACK_RESOURCE_TYPES;
+    : [];
 
   if (!isMounted) {
     return (
@@ -564,6 +618,71 @@ export default function CurriculumPage() {
                     )}
                   </div>
 
+                  {/* Filename Suggestion Banner */}
+                  {selectedFile && suggestedMetadata && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-4 text-primary flex-shrink-0" />
+                        <div>
+                          <span className="font-semibold text-foreground">Detected from filename: </span>
+                          <span className="text-muted-foreground font-mono">
+                            {suggestedMetadata.grade ? `Grade ${suggestedMetadata.grade}` : 'Grade ?'} • {suggestedMetadata.subjectCode || 'Subject ?'} • {suggestedMetadata.language || 'Medium ?'}
+                            {suggestedMetadata.part ? ` • Part ${suggestedMetadata.part}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-7 text-xs px-2.5 font-medium"
+                          onClick={applySuggestedMetadata}
+                        >
+                          Apply Suggestions
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2 text-muted-foreground"
+                          onClick={dismissSuggestedMetadata}
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metadata Mismatch Warning */}
+                  {selectedFile && hasAnyMismatch && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 space-y-0.5">
+                        <p className="font-semibold">Metadata Mismatch Warning</p>
+                        <p className="text-[11px] leading-relaxed opacity-90">
+                          Detected file properties differ from currently selected form values:{' '}
+                          {hasGradeMismatch && (
+                            <span className="font-mono font-medium">
+                              [Grade: Form {uploadGrade} ≠ Detected {suggestedMetadata?.grade}]
+                            </span>
+                          )}{' '}
+                          {hasSubjectMismatch && (
+                            <span className="font-mono font-medium">
+                              [Subject: Form {uploadSubject} ≠ Detected {suggestedMetadata?.subjectCode}]
+                            </span>
+                          )}{' '}
+                          {hasLanguageMismatch && (
+                            <span className="font-mono font-medium">
+                              [Medium: Form {uploadLanguage} ≠ Detected {suggestedMetadata?.language}]
+                            </span>
+                          )}
+                          . Your selected form values will be used authoritatively.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Metadata Form Grid */}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {/* Grade Selector */}
@@ -592,7 +711,7 @@ export default function CurriculumPage() {
                         onChange={(e) => handleSubjectChange(e.target.value)}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        {availableSubjects.map((s) => (
+                        {availableUploadSubjects.map((s) => (
                           <option key={s.code} value={s.code}>
                             {s.name}
                           </option>
@@ -736,7 +855,12 @@ export default function CurriculumPage() {
                     >
                       Clear
                     </Button>
-                    <Button type="submit" size="sm" disabled={!selectedFile || isUploading} className="gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={!selectedFile || isUploading || !catalogue || !catalogue.subjects || catalogue.subjects.length === 0}
+                      className="gap-2"
+                    >
                       {isUploading ? (
                         <>
                           <Loader2 className="size-4 animate-spin" />
@@ -800,7 +924,7 @@ export default function CurriculumPage() {
                     className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="ALL">All Subjects</option>
-                    {availableSubjects.map((s) => (
+                    {allSubjects.map((s) => (
                       <option key={s.code} value={s.code}>
                         {s.name}
                       </option>
