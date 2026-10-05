@@ -24,12 +24,13 @@ import { Input } from '@/components/ui/input';
 import { SidebarNav } from '@/components/SidebarNav';
 import {
   backofficeApi,
+  type CurriculumCatalogueResponse,
   type CurriculumResourceItem,
   type CurriculumResourceRequest,
   type CurriculumResourceType,
 } from '@/lib/atlas-api';
 
-const STANDARD_SUBJECTS = [
+const FALLBACK_SUBJECTS = [
   { code: 'SCIENCE', name: 'Science (විද්‍යාව / அறிவியல்)' },
   { code: 'MATHEMATICS', name: 'Mathematics (ගණිතය / கணிதம்)' },
   { code: 'ICT', name: 'Information & Comm. Technology (තොරතුරු තාක්ෂණය)' },
@@ -39,7 +40,7 @@ const STANDARD_SUBJECTS = [
   { code: 'COMMERCE', name: 'Commerce & Accounting (ව්‍යාපාර හා ගිණුම්කරණය)' },
 ];
 
-const RESOURCE_TYPES: { value: CurriculumResourceType; label: string }[] = [
+const FALLBACK_RESOURCE_TYPES: { value: CurriculumResourceType; label: string }[] = [
   { value: 'TEXTBOOK', label: 'Official Textbook (පෙළපොත)' },
   { value: 'TEACHER_GUIDE', label: 'Teacher Guide (ගුරු මාර්ගෝපදේශය)' },
   { value: 'SYLLABUS', label: 'Syllabus / Curriculum Guide (විෂය නිර්දේශය)' },
@@ -116,6 +117,7 @@ function computeVersion(year: number, language: string, part?: string | null): s
 }
 
 export default function CurriculumPage() {
+  const [catalogue, setCatalogue] = useState<CurriculumCatalogueResponse | null>(null);
   const [resources, setResources] = useState<CurriculumResourceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,11 +127,13 @@ export default function CurriculumPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string>('ALL');
   const [subjectFilter, setSubjectFilter] = useState<string>('ALL');
-  const [tenantId, setTenantId] = useState('atlas-pilot');
 
   // Upload Form state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadCountry, setUploadCountry] = useState<string>('LK');
+  const [uploadCurriculum, setUploadCurriculum] = useState<string>('NATIONAL');
+  const [uploadVersionCode, setUploadVersionCode] = useState<string>('POC-UNVERIFIED');
   const [uploadGrade, setUploadGrade] = useState<number>(10);
   const [uploadSubject, setUploadSubject] = useState<string>('SCIENCE');
   const [uploadLanguage, setUploadLanguage] = useState<string>('EN');
@@ -148,11 +152,30 @@ export default function CurriculumPage() {
   const [resourceToDelete, setResourceToDelete] = useState<CurriculumResourceItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  const loadResources = async () => {
+  const loadCatalogAndResources = async () => {
     setIsLoading(true);
     try {
-      const data = await backofficeApi.listCurriculumResources(tenantId);
-      setResources(data);
+      const [catData, resData] = await Promise.all([
+        backofficeApi.getCurriculumCatalogue().catch((e) => {
+          console.warn('Failed to fetch DB-driven catalogue, using defaults:', e);
+          return null;
+        }),
+        backofficeApi.listCurriculumResources(),
+      ]);
+
+      if (catData) {
+        setCatalogue(catData);
+        if (catData.countries.length > 0 && !uploadCountry) {
+          setUploadCountry(catData.countries[0].isoCode);
+        }
+        if (catData.curricula.length > 0 && !uploadCurriculum) {
+          setUploadCurriculum(catData.curricula[0].code);
+        }
+        if (catData.versions.length > 0 && uploadVersionCode === 'POC-UNVERIFIED') {
+          setUploadVersionCode(catData.versions[0].versionCode);
+        }
+      }
+      setResources(resData);
       setError(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unable to load curriculum resources.';
@@ -163,8 +186,8 @@ export default function CurriculumPage() {
   };
 
   useEffect(() => {
-    void loadResources();
-  }, [tenantId]);
+    void loadCatalogAndResources();
+  }, []);
 
   const handleConfirmDelete = async () => {
     if (!resourceToDelete) return;
@@ -172,12 +195,12 @@ export default function CurriculumPage() {
     setError(null);
     setSuccessMessage(null);
     try {
-      await backofficeApi.deleteCurriculumResource(resourceToDelete.revisionId, tenantId);
+      await backofficeApi.deleteCurriculumResource(resourceToDelete.revisionId);
       setSuccessMessage(
         `Successfully deleted "${resourceToDelete.originalTitle}" and purged ${resourceToDelete.indexedChunks || 0} vector chunks from the AI Tutor vector store.`
       );
       setResourceToDelete(null);
-      await loadResources();
+      await loadCatalogAndResources();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete curriculum resource.';
       setError(msg);
@@ -253,12 +276,13 @@ export default function CurriculumPage() {
     setError(null);
     setSuccessMessage(null);
 
+    const ksCode = catalogue?.knowledgeSpace?.code || 'NATIONAL';
     const metadata: CurriculumResourceRequest = {
       scope: {
-        knowledgeSpaceCode: 'NATIONAL',
-        countryCode: 'LK',
-        curriculumCode: 'NATIONAL',
-        curriculumVersion: 'POC-UNVERIFIED',
+        knowledgeSpaceCode: ksCode,
+        countryCode: uploadCountry,
+        curriculumCode: uploadCurriculum,
+        curriculumVersion: uploadVersionCode,
         grade: Number(uploadGrade),
         subjectCode: uploadSubject,
         language: uploadLanguage,
@@ -273,7 +297,7 @@ export default function CurriculumPage() {
     };
 
     try {
-      const res = await backofficeApi.uploadCurriculumResource(selectedFile, metadata, tenantId);
+      const res = await backofficeApi.uploadCurriculumResource(selectedFile, metadata);
       setSuccessMessage(
         `Successfully indexed "${uploadTitle}"! Created resource ${res.resourceId.substring(0, 8)} with ${res.indexedChunks} searchable chunks in the Learn Vector Store.`
       );
@@ -284,7 +308,7 @@ export default function CurriculumPage() {
       setIsCustomReference(false);
       setIsCustomVersion(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      await loadResources();
+      await loadCatalogAndResources();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Curriculum upload failed.';
       setError(msg);
@@ -316,6 +340,27 @@ export default function CurriculumPage() {
 
   const totalChunks = resources.reduce((sum, r) => sum + (r.indexedChunks || 0), 0);
   const uniqueLanguages = new Set(resources.map((r) => r.languageCode)).size;
+
+  // DB-driven catalogue options with graceful fallbacks
+  const availableGrades = catalogue?.grades?.length
+    ? catalogue.grades.map((g) => g.gradeNumber)
+    : Array.from({ length: 13 }, (_, i) => i + 1);
+
+  const availableSubjects = catalogue?.subjects?.length
+    ? catalogue.subjects.map((s) => ({ code: s.code, name: s.name }))
+    : FALLBACK_SUBJECTS;
+
+  const availableLanguages = catalogue?.languages?.length
+    ? catalogue.languages
+    : [
+        { code: 'EN', name: 'English Medium (EN)' },
+        { code: 'SI', name: 'Sinhala Medium (සිංහල - SI)' },
+        { code: 'TA', name: 'Tamil Medium (தமிழ் - TA)' },
+      ];
+
+  const availableResourceTypes = catalogue?.resourceTypes?.length
+    ? catalogue.resourceTypes
+    : FALLBACK_RESOURCE_TYPES;
 
   if (!isMounted) {
     return (
@@ -365,16 +410,14 @@ export default function CurriculumPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground hidden sm:inline">Tenant:</span>
-                <select
-                  value={tenantId}
-                  onChange={(e) => setTenantId(e.target.value)}
-                  className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="atlas-pilot">atlas-pilot</option>
-                  <option value="learn-consumer">learn-consumer</option>
-                </select>
+              <div className="flex items-center gap-1.5 bg-muted/60 border border-border px-2.5 py-1 rounded-md">
+                <span className="text-[11px] text-muted-foreground font-medium">Owner:</span>
+                <span className="text-[11px] font-mono font-semibold text-primary">
+                  {catalogue?.knowledgeSpace?.tenantId || 'atlas-platform'}
+                </span>
+                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded font-semibold">
+                  SHARED
+                </span>
               </div>
               <Button variant="ghost" size="icon" aria-label="Notifications">
                 <Bell className="size-4" />
@@ -398,7 +441,7 @@ export default function CurriculumPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadResources}
+                onClick={loadCatalogAndResources}
                 disabled={isLoading}
                 className="gap-2 self-start"
               >
@@ -532,7 +575,7 @@ export default function CurriculumPage() {
                         onChange={(e) => handleGradeChange(Number(e.target.value))}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        {Array.from({ length: 13 }, (_, i) => i + 1).map((g) => (
+                        {availableGrades.map((g) => (
                           <option key={g} value={g}>
                             Grade {g}
                           </option>
@@ -549,7 +592,7 @@ export default function CurriculumPage() {
                         onChange={(e) => handleSubjectChange(e.target.value)}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        {STANDARD_SUBJECTS.map((s) => (
+                        {availableSubjects.map((s) => (
                           <option key={s.code} value={s.code}>
                             {s.name}
                           </option>
@@ -566,9 +609,11 @@ export default function CurriculumPage() {
                         onChange={(e) => handleLanguageChange(e.target.value)}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        <option value="EN">English Medium (EN)</option>
-                        <option value="SI">Sinhala Medium (සිංහල - SI)</option>
-                        <option value="TA">Tamil Medium (தமிழ் - TA)</option>
+                        {availableLanguages.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -581,7 +626,7 @@ export default function CurriculumPage() {
                         onChange={(e) => setUploadResourceType(e.target.value as CurriculumResourceType)}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        {RESOURCE_TYPES.map((t) => (
+                        {availableResourceTypes.map((t) => (
                           <option key={t.value} value={t.value}>
                             {t.label}
                           </option>
@@ -658,12 +703,16 @@ export default function CurriculumPage() {
 
                     {/* Target Knowledge Space */}
                     <div className="space-y-1.5 sm:col-span-1">
-                      <label htmlFor="curriculum-std" className="text-xs font-semibold text-foreground">Curriculum Standard</label>
+                      <label htmlFor="curriculum-std" className="text-xs font-semibold text-foreground">Target Knowledge Space</label>
                       <Input
                         id="curriculum-std"
-                        value="Sri Lanka National (LK-NATIONAL)"
+                        value={
+                          catalogue?.knowledgeSpace
+                            ? `${catalogue.knowledgeSpace.name} (${catalogue.knowledgeSpace.tenantId})`
+                            : 'Sri Lanka National (atlas-platform)'
+                        }
                         disabled
-                        className="h-9 text-xs bg-muted text-muted-foreground"
+                        className="h-9 text-xs bg-muted text-muted-foreground font-medium"
                       />
                     </div>
                   </div>
@@ -737,7 +786,7 @@ export default function CurriculumPage() {
                     className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="ALL">All Grades</option>
-                    {Array.from({ length: 13 }, (_, i) => i + 1).map((g) => (
+                    {availableGrades.map((g) => (
                       <option key={g} value={g}>
                         Grade {g}
                       </option>
@@ -751,9 +800,9 @@ export default function CurriculumPage() {
                     className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="ALL">All Subjects</option>
-                    {STANDARD_SUBJECTS.map((s) => (
+                    {availableSubjects.map((s) => (
                       <option key={s.code} value={s.code}>
-                        {s.code}
+                        {s.name}
                       </option>
                     ))}
                   </select>

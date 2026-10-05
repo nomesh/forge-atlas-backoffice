@@ -170,19 +170,15 @@ export const backofficeApi = {
       { method: 'PATCH', body: JSON.stringify({ status }) },
     );
   },
-  async listCurriculumResources(
-    tenantId: string = 'atlas-pilot',
-  ): Promise<CurriculumResourceItem[]> {
-    return request<CurriculumResourceItem[]>('/api/v1/learn/resources', {
-      headers: {
-        'X-Atlas-Tenant-Id': tenantId,
-      },
-    });
+  async getCurriculumCatalogue(): Promise<CurriculumCatalogueResponse> {
+    return request<CurriculumCatalogueResponse>('/api/backoffice/v1/curriculum/catalogue');
+  },
+  async listCurriculumResources(): Promise<CurriculumResourceItem[]> {
+    return request<CurriculumResourceItem[]>('/api/backoffice/v1/curriculum/resources');
   },
   async uploadCurriculumResource(
     file: File,
     metadata: CurriculumResourceRequest,
-    tenantId: string = 'atlas-pilot',
   ): Promise<CurriculumIngestionResult> {
     const formData = new FormData();
     formData.append('file', file);
@@ -193,11 +189,10 @@ export const backofficeApi = {
 
     const authToken = await token();
     const baseUrl = resolveApiBaseUrl();
-    const response = await fetch(`${baseUrl}/api/v1/learn/resources`, {
+    const response = await fetch(`${baseUrl}/api/backoffice/v1/curriculum/resources`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${authToken}`,
-        'X-Atlas-Tenant-Id': tenantId,
         Accept: 'application/json',
       },
       body: formData,
@@ -217,17 +212,15 @@ export const backofficeApi = {
   },
   async deleteCurriculumResource(
     revisionId: string,
-    tenantId: string = 'atlas-pilot',
   ): Promise<void> {
     const authToken = await token();
     const baseUrl = resolveApiBaseUrl();
     const response = await fetch(
-      `${baseUrl}/api/v1/learn/resources/${encodeURIComponent(revisionId)}`,
+      `${baseUrl}/api/backoffice/v1/curriculum/resources/${encodeURIComponent(revisionId)}`,
       {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${authToken}`,
-          'X-Atlas-Tenant-Id': tenantId,
           Accept: 'application/json',
         },
       },
@@ -301,4 +294,22 @@ export interface CurriculumResourceItem {
   ingestedAt?: string;
   checksumSha256: string;
   indexedChunks: number;
+}
+
+export interface CurriculumCatalogueResponse {
+  countries: Array<{ id: string; isoCode: string; name: string }>;
+  curricula: Array<{ id: string; code: string; name: string; authority: string; countryCode: string }>;
+  versions: Array<{ id: string; versionCode: string; status: string; curriculumCode: string }>;
+  grades: Array<{ gradeNumber: number; displayName: string }>;
+  subjects: Array<{ code: string; name: string; grades: number[]; languages: string[] }>;
+  knowledgeSpace?: {
+    id: string;
+    tenantId: string;
+    code: string;
+    name: string;
+    productType: string;
+    status: string;
+  } | null;
+  languages: Array<{ code: string; name: string }>;
+  resourceTypes: Array<{ value: CurriculumResourceType; label: string }>;
 }

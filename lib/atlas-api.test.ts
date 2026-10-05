@@ -129,33 +129,58 @@ describe('backofficeApi', () => {
     expect(headers.Authorization).toBe('Bearer test-token');
   });
 
-  it('deleteCurriculumResource issues DELETE with proper URL, headers and tenant', async () => {
+  it('deleteCurriculumResource issues DELETE with proper URL and authorization header', async () => {
     const fetchMock = mockFetchOnce(204, {});
     const revId = '550e8400-e29b-41d4-a716-446655440000';
-    await backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot');
+    await backofficeApi.deleteCurriculumResource(revId);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0][0] as string;
     const init = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(url).toBe(`http://localhost:8080/api/v1/learn/resources/${revId}`);
+    expect(url).toBe(`http://localhost:8080/api/backoffice/v1/curriculum/resources/${revId}`);
     expect(init.method).toBe('DELETE');
     const headers = init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer test-token');
-    expect(headers['X-Atlas-Tenant-Id']).toBe('atlas-pilot');
   });
 
   it('deleteCurriculumResource throws AtlasApiError on failure', async () => {
     mockFetchOnce(500, { error: 'DELETE_FAILED', message: 'Failed to purge chunks' });
     const revId = 'test-rev-id';
-    await expect(backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot')).rejects.toThrow(AtlasApiError);
+    await expect(backofficeApi.deleteCurriculumResource(revId)).rejects.toThrow(AtlasApiError);
     try {
-      await backofficeApi.deleteCurriculumResource(revId, 'atlas-pilot');
+      await backofficeApi.deleteCurriculumResource(revId);
     } catch (e) {
       expect(e).toBeInstanceOf(AtlasApiError);
       expect((e as AtlasApiError).status).toBe(500);
       expect((e as AtlasApiError).error).toBe('DELETE_FAILED');
       expect((e as AtlasApiError).message).toBe('Failed to purge chunks');
     }
+  });
+
+  it('getCurriculumCatalogue queries /api/backoffice/v1/curriculum/catalogue', async () => {
+    const mockCatalogue = {
+      countries: [{ id: 'c1', isoCode: 'LK', name: 'Sri Lanka' }],
+      curricula: [],
+      versions: [],
+      grades: [{ gradeNumber: 10, displayName: 'Grade 10' }],
+      subjects: [{ code: 'SCIENCE', name: 'Science', grades: [10], languages: ['EN'] }],
+      languages: [{ code: 'EN', name: 'English' }],
+      resourceTypes: [{ value: 'TEXTBOOK', label: 'Official Textbook' }],
+    };
+    const fetchMock = mockFetchOnce(200, mockCatalogue);
+    const result = await backofficeApi.getCurriculumCatalogue();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/backoffice/v1/curriculum/catalogue');
+    expect(result.countries[0].isoCode).toBe('LK');
+  });
+
+  it('listCurriculumResources queries /api/backoffice/v1/curriculum/resources', async () => {
+    const fetchMock = mockFetchOnce(200, []);
+    await backofficeApi.listCurriculumResources();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/backoffice/v1/curriculum/resources');
   });
 
   describe('URL resolution and regression guards', () => {
