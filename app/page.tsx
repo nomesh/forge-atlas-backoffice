@@ -244,27 +244,7 @@ export default function Home() {
                 </CardContent>
               </Card>
               <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock3 className="size-5 text-primary" />
-                      Provisioning queue
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <QueueItem
-                      name="Verde Advisory"
-                      detail="Identity setup · Attempt 2"
-                    />
-                    <QueueItem
-                      name="Oriel Partners"
-                      detail="Workspace allocation · 7 min"
-                    />
-                    <Button variant="outline" className="w-full">
-                      Open operations queue
-                    </Button>
-                  </CardContent>
-                </Card>
+                <ProvisioningPreviewCard />
                 <Card className="border-primary/20 bg-primary/[0.045]">
                   <CardContent className="flex gap-3 pt-6">
                     <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" />
@@ -337,17 +317,63 @@ function StatusBadge({ status }: { status: string }) {
     </Badge>
   );
 }
-function QueueItem({ name, detail }: { name: string; detail: string }) {
+function ProvisioningPreviewCard() {
+  const [jobs, setJobs] = useState<import('@/lib/atlas-api').ProvisioningJobDto[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    backofficeApi
+      .listJobs({ page: 0, size: 4 })
+      .then((res) => setJobs(res.items))
+      .catch(() => setJobs([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-9 place-items-center rounded-lg bg-secondary">
-        <Building2 className="size-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{name}</p>
-        <p className="truncate text-xs text-muted-foreground">{detail}</p>
-      </div>
-      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock3 className="size-5 text-primary" />
+          Provisioning queue
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="text-xs text-muted-foreground">Loading queue…</p>
+        ) : jobs.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No active provisioning jobs.</p>
+        ) : (
+          jobs.map((job) => (
+            <div key={job.jobId} className="flex items-center gap-3">
+              <div className="grid size-9 place-items-center rounded-lg bg-secondary">
+                <Building2 className="size-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{job.customerName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {job.status} · {job.currentStep ?? 'QUEUED'}
+                </p>
+              </div>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                job.status === 'SUCCEEDED'
+                  ? 'bg-emerald-500/10 text-emerald-700'
+                  : job.status === 'FAILED'
+                  ? 'bg-rose-500/10 text-rose-700'
+                  : 'bg-blue-500/10 text-blue-700'
+              }`}>
+                {job.status}
+              </span>
+            </div>
+          ))
+        )}
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => location.assign('/provisioning')}
+        >
+          Open operations queue
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

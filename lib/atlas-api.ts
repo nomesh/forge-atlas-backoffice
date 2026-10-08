@@ -170,6 +170,98 @@ export const backofficeApi = {
       { method: 'PATCH', body: JSON.stringify({ status }) },
     );
   },
+  async getCustomerDetail(customerId: string): Promise<CustomerDetailDto> {
+    return request<CustomerDetailDto>(`/api/backoffice/v1/customers/${customerId}`);
+  },
+  async updateCustomer(
+    customerId: string,
+    body: { status?: string; companyName?: string; contactPhone?: string; billingEmail?: string },
+  ): Promise<CustomerDetailDto> {
+    return request<CustomerDetailDto>(`/api/backoffice/v1/customers/${customerId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+  async listJobs(params?: {
+    status?: string;
+    page?: number;
+    size?: number;
+  }): Promise<ProvisioningPageDto> {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.page !== undefined) q.set('page', String(params.page));
+    if (params?.size !== undefined) q.set('size', String(params.size));
+    const s = q.toString();
+    return request<ProvisioningPageDto>(`/api/backoffice/v1/provisioning/jobs${s ? `?${s}` : ''}`);
+  },
+  async getJob(jobId: string): Promise<ProvisioningJobDto> {
+    return request<ProvisioningJobDto>(`/api/backoffice/v1/provisioning/jobs/${jobId}`);
+  },
+  async getJobSteps(jobId: string): Promise<ProvisioningStepDto[]> {
+    return request<ProvisioningStepDto[]>(`/api/backoffice/v1/provisioning/jobs/${jobId}/steps`);
+  },
+  async approveJob(jobId: string): Promise<ProvisioningJobDto> {
+    return request<ProvisioningJobDto>(`/api/backoffice/v1/provisioning/jobs/${jobId}/approve`, {
+      method: 'POST',
+    });
+  },
+  async rejectJob(jobId: string, reason?: string): Promise<ProvisioningJobDto> {
+    return request<ProvisioningJobDto>(`/api/backoffice/v1/provisioning/jobs/${jobId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? 'Rejected by staff operator' }),
+    });
+  },
+  async retryJob(jobId: string): Promise<ProvisioningJobDto> {
+    return request<ProvisioningJobDto>(`/api/backoffice/v1/provisioning/jobs/${jobId}/retry`, {
+      method: 'POST',
+    });
+  },
+  async listUsers(customerId: string): Promise<ProfessionalUserDto[]> {
+    return request<ProfessionalUserDto[]>(`/api/backoffice/v1/customers/${customerId}/users`);
+  },
+  async inviteUser(
+    customerId: string,
+    body: { email: string; displayName: string; role?: string },
+  ): Promise<ProfessionalUserDto> {
+    return request<ProfessionalUserDto>(`/api/backoffice/v1/customers/${customerId}/users`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  async updateUser(
+    customerId: string,
+    userId: string,
+    body: { status?: string; role?: string },
+  ): Promise<ProfessionalUserDto> {
+    return request<ProfessionalUserDto>(`/api/backoffice/v1/customers/${customerId}/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+  async listDevices(customerId: string): Promise<DeviceDto[]> {
+    return request<DeviceDto[]>(`/api/backoffice/v1/customers/${customerId}/devices`);
+  },
+  async revokeDevice(customerId: string, deviceId: string): Promise<void> {
+    return request<void>(`/api/backoffice/v1/customers/${customerId}/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+  },
+  async listAuditEvents(params?: {
+    customerId?: string;
+    tenantId?: string;
+    action?: string;
+    page?: number;
+    size?: number;
+  }): Promise<AuditPageDto> {
+    const q = new URLSearchParams();
+    if (params?.customerId) q.set('customerId', params.customerId);
+    if (params?.tenantId) q.set('tenantId', params.tenantId);
+    if (params?.action) q.set('action', params.action);
+    if (params?.page !== undefined) q.set('page', String(params.page));
+    if (params?.size !== undefined) q.set('size', String(params.size));
+    const s = q.toString();
+    return request<AuditPageDto>(`/api/backoffice/v1/audit-events${s ? `?${s}` : ''}`);
+  },
   async getCurriculumCatalogue(): Promise<CurriculumCatalogueResponse> {
     return request<CurriculumCatalogueResponse>('/api/backoffice/v1/curriculum/catalogue');
   },
@@ -313,3 +405,126 @@ export interface CurriculumCatalogueResponse {
   languages: Array<{ code: string; name: string }>;
   resourceTypes: Array<{ value: CurriculumResourceType; label: string }>;
 }
+
+export interface CustomerDetailDto {
+  customerId: string;
+  email: string;
+  displayName: string;
+  companyName: string | null;
+  contactPhone: string | null;
+  billingEmail: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  tenants: CustomerTenantDto[];
+  subscription: CustomerSubscriptionDto | null;
+  userCount: number;
+  deviceCount: number;
+}
+
+export interface CustomerTenantDto {
+  tenantId: string;
+  tenantCode: string;
+  name: string;
+  status: string;
+  region: string;
+  createdAt: string;
+}
+
+export interface CustomerSubscriptionDto {
+  subscriptionId: string;
+  planCode: string;
+  planVersion: number;
+  status: string;
+  seatCount: number;
+  maxSeats: number;
+  startsAt: string;
+  expiresAt: string | null;
+}
+
+export interface ProvisioningJobDto {
+  jobId: string;
+  customerId: string;
+  customerEmail: string;
+  customerName: string;
+  tenantId: string | null;
+  planCode: string;
+  status: string;
+  currentStep: string | null;
+  errorMessage: string | null;
+  retryCount: number;
+  maxRetries: number;
+  eligibleForRetry: boolean;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface ProvisioningStepDto {
+  stepId: string;
+  jobId: string;
+  stepName: string;
+  stepOrder: number;
+  status: string;
+  attemptCount: number;
+  errorMessage: string | null;
+  diagnosticsJson: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface ProvisioningPageDto {
+  items: ProvisioningJobDto[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface ProfessionalUserDto {
+  userId: string;
+  customerId: string;
+  tenantId: string;
+  email: string;
+  displayName: string;
+  role: string;
+  status: string;
+  keycloakUserId: string | null;
+  invitedAt: string;
+  activatedAt: string | null;
+  lastLoginAt: string | null;
+}
+
+export interface DeviceDto {
+  deviceId: string;
+  tenantId: string;
+  userId: string;
+  userEmail: string | null;
+  deviceFingerprint: string;
+  platform: string;
+  status: string;
+  registeredAt: string;
+  lastSeenAt: string;
+}
+
+export interface AuditEventDto {
+  eventId: string;
+  customerId: string | null;
+  tenantId: string | null;
+  operatorId: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  detailsJson: string | null;
+  ipAddress: string | null;
+  timestamp: string;
+}
+
+export interface AuditPageDto {
+  items: AuditEventDto[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
