@@ -262,6 +262,55 @@ export const backofficeApi = {
     const s = q.toString();
     return request<AuditPageDto>(`/api/backoffice/v1/audit-events${s ? `?${s}` : ''}`);
   },
+  async searchLearnStudents(query?: string): Promise<LearnStudentSummaryDto[]> {
+    const q = new URLSearchParams();
+    if (query) q.set('query', query);
+    const s = q.toString();
+    return request<LearnStudentSummaryDto[]>(`/api/learn/admin/students${s ? `?${s}` : ''}`);
+  },
+  async getLearnStudentDetail(studentId: string): Promise<LearnStudentBackofficeDetailDto> {
+    return request<LearnStudentBackofficeDetailDto>(`/api/backoffice/v1/learn/students/${encodeURIComponent(studentId)}`);
+  },
+  async updateLearnStudentStatus(studentId: string, status: string): Promise<LearnStudentBackofficeDetailDto> {
+    return request<LearnStudentBackofficeDetailDto>(`/api/backoffice/v1/learn/students/${encodeURIComponent(studentId)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    });
+  },
+  async revokeLearnStudentDevice(studentId: string, deviceId: string): Promise<void> {
+    return request<void>(`/api/backoffice/v1/learn/students/${encodeURIComponent(studentId)}/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+  },
+  async listLearnPayments(params?: {
+    status?: string;
+    page?: number;
+    size?: number;
+  }): Promise<LearnPaymentPageDto> {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.page !== undefined) q.set('page', String(params.page));
+    if (params?.size !== undefined) q.set('size', String(params.size));
+    const s = q.toString();
+    return request<LearnPaymentPageDto>(`/api/backoffice/v1/learn/payments${s ? `?${s}` : ''}`);
+  },
+  async getLearnPayment(paymentId: string): Promise<LearnPaymentSlipDto> {
+    return request<LearnPaymentSlipDto>(`/api/backoffice/v1/learn/payments/${paymentId}`);
+  },
+  async approveLearnPayment(paymentId: string): Promise<LearnPaymentSlipDto> {
+    return request<LearnPaymentSlipDto>(`/api/backoffice/v1/learn/payments/${paymentId}/approve`, {
+      method: 'POST',
+    });
+  },
+  async rejectLearnPayment(paymentId: string, reason: string): Promise<LearnPaymentSlipDto> {
+    return request<LearnPaymentSlipDto>(`/api/backoffice/v1/learn/payments/${paymentId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+  async getLearnPaymentPreviewUrl(paymentId: string): Promise<{ previewUrl: string }> {
+    return request<{ previewUrl: string }>(`/api/backoffice/v1/learn/payments/${paymentId}/preview-url`);
+  },
   async getCurriculumCatalogue(): Promise<CurriculumCatalogueResponse> {
     return request<CurriculumCatalogueResponse>('/api/backoffice/v1/curriculum/catalogue');
   },
@@ -527,4 +576,76 @@ export interface AuditPageDto {
   totalItems: number;
   totalPages: number;
 }
+
+export interface LearnStudentSummaryDto {
+  id: string;
+  studentId: string;
+  username: string;
+  fullName: string;
+  mobileNumber: string;
+  grade: string;
+  preferredLanguage: string;
+  status: string;
+  activeDevicesCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LearnDeviceRegistrationDto {
+  id: string;
+  deviceName: string;
+  userAgentSummary: string;
+  status: string;
+  registeredAt: string;
+  lastSeenAt: string;
+  current: boolean;
+}
+
+export interface LearnPaymentSlipDto {
+  id: string;
+  studentId: string;
+  studentName: string;
+  username: string;
+  grade: string;
+  amount: number;
+  currency: string;
+  billingPeriod: string;
+  originalFilename: string;
+  contentType: string;
+  fileSizeBytes: number;
+  status: string;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  rejectionReason: string | null;
+  notes: string | null;
+}
+
+export interface LearnPaymentPageDto {
+  items: LearnPaymentSlipDto[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface LearnStudentBackofficeDetailDto {
+  id: string;
+  studentId: string;
+  username: string;
+  fullName: string;
+  mobileNumber: string;
+  grade: string;
+  preferredLanguage: string;
+  status: string;
+  keycloakUserId: string;
+  accountId: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  activeDevicesCount: number;
+  registeredDevices: LearnDeviceRegistrationDto[];
+  payments: LearnPaymentSlipDto[];
+}
+
 

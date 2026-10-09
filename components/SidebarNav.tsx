@@ -48,7 +48,7 @@ function NavItem({
 export function SidebarNav({
   active,
 }: {
-  active?: '/' | '/customers' | '/curriculum' | '/provisioning' | '/audit';
+  active?: '/' | '/customers' | '/curriculum' | '/provisioning' | '/audit' | '/learn/students' | '/learn/payments';
 }) {
   return (
     <aside className="hidden border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex lg:flex-col">
@@ -79,6 +79,18 @@ export function SidebarNav({
           icon={<Users />}
           label="Provisioning"
           active={active === '/provisioning'}
+        />
+        <NavItem
+          href="/learn/students"
+          icon={<GraduationCap />}
+          label="Learn Students"
+          active={active === '/learn/students'}
+        />
+        <NavItem
+          href="/learn/payments"
+          icon={<Activity />}
+          label="Payment Slips"
+          active={active === '/learn/payments'}
         />
         <NavItem
           href="/curriculum"
