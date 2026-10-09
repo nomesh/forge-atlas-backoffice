@@ -36,6 +36,12 @@ export default function LearnStudentDetailPage() {
 
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+
+  // Entitlement management state
+  const [accountType, setAccountType] = useState<'STUDENT' | 'DEMO' | 'QA'>('STUDENT');
+  const [defaultGrade, setDefaultGrade] = useState('grade-10');
+  const [allowedGrades, setAllowedGrades] = useState<string[]>(['grade-10']);
 
   const loadStudent = async () => {
     if (!studentId) return;
@@ -44,6 +50,17 @@ export default function LearnStudentDetailPage() {
     try {
       const data = await backofficeApi.getLearnStudentDetail(studentId);
       setStudent(data);
+      if (data.accountType) {
+        setAccountType(data.accountType);
+      }
+      if (data.grade) {
+        setDefaultGrade(data.grade);
+      }
+      if (data.allowedGrades && data.allowedGrades.length > 0) {
+        setAllowedGrades(data.allowedGrades);
+      } else if (data.grade) {
+        setAllowedGrades([data.grade]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load student');
     } finally {
@@ -54,6 +71,26 @@ export default function LearnStudentDetailPage() {
   useEffect(() => {
     loadStudent();
   }, [studentId]);
+
+  const handleUpdateEntitlements = async () => {
+    if (!studentId) return;
+    setActionBusy(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const updated = await backofficeApi.updateLearnStudentEntitlements(studentId, {
+        accountType,
+        defaultGrade,
+        allowedGrades: accountType === 'STUDENT' ? [defaultGrade] : allowedGrades,
+      });
+      setActionSuccess('Entitlements updated successfully.');
+      await loadStudent();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to update entitlements');
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!studentId) return;
@@ -217,6 +254,129 @@ export default function LearnStudentDetailPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Enrolled At:</span>
                       <span>{student.createdAt ? new Date(student.createdAt).toLocaleDateString() : '—'}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Controlled Entitlements & Multi-Grade Access Card */}
+                <Card className="md:col-span-2 border-primary/20">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Shield className="size-4 text-primary" />
+                        Account Type & Authoritative Grade Entitlements
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Configure controlled multi-grade access for internal DEMO and QA profiles. Normal students remain strictly single-grade.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={actionBusy}
+                      onClick={handleUpdateEntitlements}
+                    >
+                      {actionBusy ? 'Saving…' : 'Save Entitlements'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-2 text-sm">
+                    {actionSuccess && (
+                      <div className="rounded-lg bg-emerald-500/10 p-2.5 text-xs text-emerald-700 font-medium">
+                        {actionSuccess}
+                      </div>
+                    )}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Account Classification</label>
+                        <select
+                          value={accountType}
+                          onChange={(e) => {
+                            const val = e.target.value as 'STUDENT' | 'DEMO' | 'QA';
+                            setAccountType(val);
+                            if (val === 'STUDENT') {
+                              setAllowedGrades([defaultGrade]);
+                            }
+                          }}
+                          className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <option value="STUDENT">STUDENT (Single registered grade)</option>
+                          <option value="DEMO">DEMO (Controlled multi-grade showcase)</option>
+                          <option value="QA">QA (Multi-grade test & validation)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Default / Registered Grade</label>
+                        <select
+                          value={defaultGrade}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDefaultGrade(val);
+                            if (accountType === 'STUDENT') {
+                              setAllowedGrades([val]);
+                            } else if (!allowedGrades.includes(val)) {
+                              setAllowedGrades([...allowedGrades, val]);
+                            }
+                          }}
+                          className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {[6, 7, 8, 9, 10, 11].map((g) => (
+                            <option key={g} value={`grade-${g}`}>
+                              Grade {g}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">
+                          Authorized Grade Entitlements
+                        </label>
+                        <span className="text-xs text-muted-foreground">
+                          {accountType === 'STUDENT'
+                            ? 'Locked to default grade for STUDENT'
+                            : `Selected: ${allowedGrades.join(', ')}`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {[6, 7, 8, 9, 10, 11].map((g) => {
+                          const gradeKey = `grade-${g}`;
+                          const isChecked = allowedGrades.includes(gradeKey);
+                          const isDefault = defaultGrade === gradeKey;
+                          const disabled = accountType === 'STUDENT';
+
+                          return (
+                            <label
+                              key={g}
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium cursor-pointer transition-colors ${
+                                isChecked
+                                  ? 'border-primary/50 bg-primary/10 text-primary'
+                                  : 'border-input hover:bg-muted/40 text-muted-foreground'
+                              } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={disabled}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setAllowedGrades([...allowedGrades, gradeKey]);
+                                  } else {
+                                    // Prevent deselecting default grade
+                                    if (isDefault) {
+                                      return;
+                                    }
+                                    setAllowedGrades(allowedGrades.filter((x) => x !== gradeKey));
+                                  }
+                                }}
+                                className="rounded border-input text-primary focus:ring-primary size-3.5"
+                              />
+                              Grade {g} {isDefault ? '(Default)' : ''}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

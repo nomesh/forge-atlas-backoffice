@@ -277,6 +277,22 @@ export const backofficeApi = {
       body: JSON.stringify({ status }),
     });
   },
+  async updateLearnStudentEntitlements(
+    studentId: string,
+    entitlements: {
+      accountType: 'STUDENT' | 'DEMO' | 'QA';
+      defaultGrade?: string;
+      allowedGrades: string[];
+    },
+  ): Promise<StudentEntitlementDetails> {
+    return request<StudentEntitlementDetails>(
+      `/api/backoffice/v1/learn/students/${encodeURIComponent(studentId)}/entitlements`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(entitlements),
+      },
+    );
+  },
   async revokeLearnStudentDevice(studentId: string, deviceId: string): Promise<void> {
     return request<void>(`/api/backoffice/v1/learn/students/${encodeURIComponent(studentId)}/devices/${deviceId}`, {
       method: 'DELETE',
@@ -629,6 +645,15 @@ export interface LearnPaymentPageDto {
   totalPages: number;
 }
 
+export interface StudentEntitlementDetails {
+  studentId: string;
+  username: string;
+  registeredGrade: string;
+  accountType: 'STUDENT' | 'DEMO' | 'QA';
+  status: string;
+  allowedGrades: string[];
+}
+
 export interface LearnStudentBackofficeDetailDto {
   id: string;
   studentId: string;
@@ -636,6 +661,8 @@ export interface LearnStudentBackofficeDetailDto {
   fullName: string;
   mobileNumber: string;
   grade: string;
+  accountType: 'STUDENT' | 'DEMO' | 'QA';
+  allowedGrades: string[];
   preferredLanguage: string;
   status: string;
   keycloakUserId: string;

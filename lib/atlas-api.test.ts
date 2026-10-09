@@ -175,6 +175,36 @@ describe('backofficeApi', () => {
     expect(result.countries[0].isoCode).toBe('LK');
   });
 
+  it('updateLearnStudentEntitlements sends PUT with accountType and allowedGrades', async () => {
+    const mockEntitlement = {
+      studentId: 'ATL-26-001001',
+      username: 'kamal',
+      registeredGrade: 'grade-10',
+      accountType: 'DEMO' as const,
+      status: 'ACTIVE',
+      allowedGrades: ['grade-8', 'grade-10'],
+    };
+    const fetchMock = mockFetchOnce(200, mockEntitlement);
+    const result = await backofficeApi.updateLearnStudentEntitlements('ATL-26-001001', {
+      accountType: 'DEMO',
+      defaultGrade: 'grade-10',
+      allowedGrades: ['grade-8', 'grade-10'],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0][0] as string;
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(url).toBe('http://localhost:8080/api/backoffice/v1/learn/students/ATL-26-001001/entitlements');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body as string)).toEqual({
+      accountType: 'DEMO',
+      defaultGrade: 'grade-10',
+      allowedGrades: ['grade-8', 'grade-10'],
+    });
+    expect(result.allowedGrades).toEqual(['grade-8', 'grade-10']);
+    expect(result.accountType).toBe('DEMO');
+  });
+
   it('listCurriculumResources queries /api/backoffice/v1/curriculum/resources', async () => {
     const fetchMock = mockFetchOnce(200, []);
     await backofficeApi.listCurriculumResources();
