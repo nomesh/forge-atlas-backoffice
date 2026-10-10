@@ -7,8 +7,8 @@
   },
   "scripts": {
     "dev": "vinext dev",
-    "build": "vinext build && npm run check:leak",
-    "check:leak": "node scripts/verify-no-localhost-leak.mjs",
+    "build": "node scripts/clean-font-cache.mjs && vinext build && npm run check:leak",
+    "check:leak": "node scripts/verify-production-build.mjs",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",

@@ -34,10 +34,43 @@ const localBindingConfig = {
     : [],
 };
 
+function fixVinextLinkNavigationPlugin() {
+  return {
+    name: 'fix-vinext-link-navigation',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      const normalized = id.replace(/\\/g, '/');
+      if (normalized.includes('vinext/dist/shims/link.js') || normalized.endsWith('/shims/link.js')) {
+        const targetFunction = `function loadNavigationModule() {\n\treturn navigationModulePromise ??= import("./navigation.js").then((module) => {\n\t\tloadedNavigationModule = module;\n\t\treturn module;\n\t});\n}`;
+        let transformed = code.replace('"use client";', '"use client";\nimport * as _vinextNavigation from "./navigation.js";');
+        transformed = transformed.replace(
+          'let loadedNavigationModule = null;',
+          'let loadedNavigationModule = _vinextNavigation;'
+        );
+        transformed = transformed.replace(
+          targetFunction,
+          'function loadNavigationModule() {\n\treturn Promise.resolve(_vinextNavigation);\n}'
+        );
+        return transformed;
+      }
+    },
+  };
+}
+
 export default defineConfig(async ({ mode }) => {
   const isTest = mode === 'test' || process.env.VITEST === 'true';
   if (isTest) {
+    const path = await import('node:path');
+    const projectRoot = process.cwd();
     return {
+      resolve: {
+        alias: {
+          '@': projectRoot,
+          'next/link': path.resolve(projectRoot, 'node_modules/vinext/dist/shims/link.js'),
+          'next/navigation': path.resolve(projectRoot, 'node_modules/vinext/dist/shims/navigation.js'),
+          'next/font/google': path.resolve(projectRoot, 'node_modules/vinext/dist/shims/font-google.js'),
+        },
+      },
       css: { postcss: { plugins: [tailwindcss()] } },
       test: {
         environment: 'jsdom',
@@ -62,6 +95,7 @@ export default defineConfig(async ({ mode }) => {
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
+      fixVinextLinkNavigationPlugin(),
       vinext(),
       sites(),
       cloudflare({
