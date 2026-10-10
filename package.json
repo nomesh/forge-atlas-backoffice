@@ -13,7 +13,8 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:e2e": "node scripts/e2e-browser-gate.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
@@ -54,6 +55,7 @@
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",
+    "playwright-core": "^1.64.0",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vite": "8.0.13",

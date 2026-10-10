@@ -35,23 +35,87 @@ const localBindingConfig = {
 };
 
 function fixVinextLinkNavigationPlugin() {
+  let transformedCount = 0;
   return {
     name: 'fix-vinext-link-navigation',
     enforce: 'pre' as const,
     transform(code: string, id: string) {
       const normalized = id.replace(/\\/g, '/');
       if (normalized.includes('vinext/dist/shims/link.js') || normalized.endsWith('/shims/link.js')) {
+        const normalizedCode = code.replace(/\r\n/g, '\n');
+        const targetDirective = '"use client";';
+        const targetVariable = 'let loadedNavigationModule = null;';
         const targetFunction = `function loadNavigationModule() {\n\treturn navigationModulePromise ??= import("./navigation.js").then((module) => {\n\t\tloadedNavigationModule = module;\n\t\treturn module;\n\t});\n}`;
-        let transformed = code.replace('"use client";', '"use client";\nimport * as _vinextNavigation from "./navigation.js";');
+        const targetPromiseAll = `\t\t\t\tconst [navigation, { AppElementsWire }, rscCacheBusting, { APP_RSC_RENDER_MODE_PREFETCH_DYNAMIC_SHELL, APP_RSC_RENDER_MODE_PREFETCH_LOADING_SHELL }, headersModule, hybridRouteOwner] = await Promise.all([\n\t\t\t\t\tloadNavigationModule(),\n\t\t\t\t\timport("../server/app-elements.js"),\n\t\t\t\t\timport("../server/app-rsc-cache-busting.js"),\n\t\t\t\t\timport("../server/app-rsc-render-mode.js"),\n\t\t\t\t\timport("../server/headers.js"),\n\t\t\t\t\tHAS_PAGES_ROUTER || HAS_CLIENT_REWRITES ? loadHybridClientRouteOwnerModule() : null\n\t\t\t\t]);`;
+        const targetPromotePromise = 'const [{ getPrefetchCache }, { stripRscCacheBustingSearchParam, stripRscSuffix }] = await Promise.all([loadNavigationModule(), import("../server/app-rsc-cache-busting.js")]);';
+
+        if (!normalizedCode.includes(targetDirective)) {
+          throw new Error(
+            '[fix-vinext-link-navigation] FAIL-CLOSED: Missing expected "use client"; directive in vinext/dist/shims/link.js'
+          );
+        }
+        if (!normalizedCode.includes(targetVariable)) {
+          throw new Error(
+            '[fix-vinext-link-navigation] FAIL-CLOSED: Missing expected "let loadedNavigationModule = null;" in vinext/dist/shims/link.js'
+          );
+        }
+        if (!normalizedCode.includes(targetFunction)) {
+          throw new Error(
+            '[fix-vinext-link-navigation] FAIL-CLOSED: Missing expected loadNavigationModule implementation in vinext/dist/shims/link.js. Upstream Vinext source layout has changed!'
+          );
+        }
+        if (!normalizedCode.includes(targetPromiseAll)) {
+          throw new Error(
+            '[fix-vinext-link-navigation] FAIL-CLOSED: Missing expected prefetch Promise.all implementation in vinext/dist/shims/link.js. Upstream Vinext source layout has changed!'
+          );
+        }
+        if (!normalizedCode.includes(targetPromotePromise)) {
+          throw new Error(
+            '[fix-vinext-link-navigation] FAIL-CLOSED: Missing expected promotePrefetchEntriesForNavigation dynamic import in vinext/dist/shims/link.js. Upstream Vinext source layout has changed!'
+          );
+        }
+
+        const staticImports = [
+          'import * as _vinextNavigation from "./navigation.js";',
+          'import * as _vinextAppElements from "../server/app-elements.js";',
+          'import * as _vinextRscCacheBusting from "../server/app-rsc-cache-busting.js";',
+          'import * as _vinextAppRscRenderMode from "../server/app-rsc-render-mode.js";',
+          'import * as _vinextHeaders from "../server/headers.js";',
+        ].join('\n');
+
+        const replacementPromiseAll = `\t\t\t\tconst navigation = _vinextNavigation;\n\t\t\t\tconst { AppElementsWire } = _vinextAppElements;\n\t\t\t\tconst rscCacheBusting = _vinextRscCacheBusting;\n\t\t\t\tconst { APP_RSC_RENDER_MODE_PREFETCH_DYNAMIC_SHELL, APP_RSC_RENDER_MODE_PREFETCH_LOADING_SHELL } = _vinextAppRscRenderMode;\n\t\t\t\tconst headersModule = _vinextHeaders;\n\t\t\t\tconst hybridRouteOwner = HAS_PAGES_ROUTER || HAS_CLIENT_REWRITES ? await loadHybridClientRouteOwnerModule() : null;`;
+        const replacementPromotePromise = 'const { getPrefetchCache } = _vinextNavigation;\n\tconst { stripRscCacheBustingSearchParam, stripRscSuffix } = _vinextRscCacheBusting;';
+
+        let transformed = normalizedCode.replace(
+          targetDirective,
+          `${targetDirective}\n${staticImports}`
+        );
         transformed = transformed.replace(
-          'let loadedNavigationModule = null;',
+          targetVariable,
           'let loadedNavigationModule = _vinextNavigation;'
         );
         transformed = transformed.replace(
           targetFunction,
           'function loadNavigationModule() {\n\treturn Promise.resolve(_vinextNavigation);\n}'
         );
+        transformed = transformed.replace(
+          targetPromiseAll,
+          replacementPromiseAll
+        );
+        transformed = transformed.replace(
+          targetPromotePromise,
+          replacementPromotePromise
+        );
+        transformedCount++;
         return transformed;
+      }
+    },
+    buildEnd() {
+      // In production build, fail closed if the expected Vinext shim was never encountered and transformed during client build
+      if (process.env.NODE_ENV === 'production' && (this as any).environment?.name === 'client' && transformedCount === 0) {
+        throw new Error(
+          '[fix-vinext-link-navigation] FAIL-CLOSED: vinext/dist/shims/link.js was never encountered during client build. Upstream Vinext module path may have changed!'
+        );
       }
     },
   };

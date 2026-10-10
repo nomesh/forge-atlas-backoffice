@@ -22,6 +22,9 @@ const keycloak = new Keycloak({
 });
 let initialized: Promise<boolean> | undefined;
 async function token() {
+  if (typeof window !== 'undefined' && (window as unknown as { __ATLAS_MOCK_TOKEN__?: string }).__ATLAS_MOCK_TOKEN__) {
+    return (window as unknown as { __ATLAS_MOCK_TOKEN__?: string }).__ATLAS_MOCK_TOKEN__!;
+  }
   initialized ??= keycloak.init({
     onLoad: 'login-required',
     pkceMethod: 'S256',
